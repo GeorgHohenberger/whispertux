@@ -15,6 +15,11 @@ try:
 except ImportError:
     from config_manager import ConfigManager
 
+try:
+    from .whisper_server_manager import WhisperServerManager
+except ImportError:
+    from whisper_server_manager import WhisperServerManager
+
 
 class WhisperManager:
     """Manages whisper.cpp integration for audio transcription"""
@@ -32,6 +37,9 @@ class WhisperManager:
         self.model_path = None
         self.temp_dir = None
         
+        # Whisper server configuration
+        self.server_manager = None
+        
         # Whisper process state
         self.current_process = None
         self.ready = False
@@ -39,6 +47,23 @@ class WhisperManager:
     def initialize(self) -> bool:
         """Initialize the whisper manager and check dependencies"""
         try:
+            # Refresh configuration from config manager
+            self.current_model = self.config.get_setting('model', 'base')
+            self.language = self.config.get_setting('whisper_language', 'auto')
+
+            # Check if we should use remote server
+            if self.config.get_setting('use_remote_server', False):
+                host = self.config.get_setting('whisper_server_host', 'localhost')
+                port = self.config.get_setting('whisper_server_port', 10300)
+                self.server_manager = WhisperServerManager(host, port)
+                self.server_manager.initialize()
+                self.ready = True
+                return True
+            else:
+                self.server_manager = None
+                self.whisper_binary = None  # Force re-detection
+                self.model_path = None      # Force re-detection
+
             # Get paths from config manager
             self.whisper_binary = self.config.get_whisper_binary_path()
             self.temp_dir = self.config.get_temp_directory()
@@ -101,6 +126,10 @@ class WhisperManager:
             print(f"Audio too short: {len(audio_data)} samples (minimum {min_samples})")
             return ""
         
+        # Check if we should use remote server
+        if self.config.get_setting('use_remote_server', False) and self.server_manager:
+            return self.server_manager.transcribe_audio(audio_data, sample_rate)
+        
         # Create temporary WAV file
         with tempfile.NamedTemporaryFile(suffix='.wav', delete=False, dir=self.temp_dir) as temp_file:
             temp_wav_path = temp_file.name
@@ -112,6 +141,9 @@ class WhisperManager:
             # Run whisper.cpp transcription
             transcription = self._run_whisper(temp_wav_path)
             
+            if not transcription:
+                print(f"DEBUG: Transcription result for {temp_wav_path} was empty")
+                
             return transcription.strip() if transcription else ""
             
         finally:
@@ -150,6 +182,7 @@ class WhisperManager:
             ]
             
             # Run the command
+            print(f"DEBUG: Running whisper.cpp: {' '.join(cmd)}")
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -165,9 +198,11 @@ class WhisperManager:
                         transcription = f.read().strip()
                     # Clean up the txt file
                     os.unlink(txt_file)
+                    print(f"DEBUG: Read transcription from {txt_file}: {transcription}")
                     return transcription
                 else:
                     # Fall back to stdout if no txt file
+                    print(f"DEBUG: Reading transcription from stdout: {result.stdout.strip()}")
                     return result.stdout.strip()
             else:
                 print(f"Whisper command failed with return code {result.returncode}")

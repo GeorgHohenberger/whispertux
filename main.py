@@ -241,11 +241,15 @@ class SettingsDialog:
 
     def _create_model_section(self, parent):
         """Create the model configuration section"""
-        model_frame = ttk.LabelFrame(parent, text="Model", padding=15)
-        model_frame.pack(fill=X, pady=(0, 15))
+        # Transcription Section (Combined Remote and Local)
+        transcription_frame = ttk.LabelFrame(parent, text="Transcription", padding=15)
+        transcription_frame.pack(fill=X, pady=(0, 15))
+
+        # Local Model settings
+        ttk.Label(transcription_frame, text="Local Model Settings", font=("Arial", 10, "bold")).pack(anchor=W, pady=(0, 10))
 
         # Model selection
-        model_selection_frame = ttk.Frame(model_frame)
+        model_selection_frame = ttk.Frame(transcription_frame)
         model_selection_frame.pack(fill=X, pady=(0, 10))
 
         ttk.Label(model_selection_frame, text="Whisper Model:").pack(side=LEFT)
@@ -271,6 +275,16 @@ class SettingsDialog:
         )
         self.model_combo_dialog.pack(side=RIGHT)
 
+        # Download Models button
+        self.download_button = ttk.Button(
+            model_selection_frame,
+            text="Download Models",
+            command=self._show_model_download_from_settings,
+            bootstyle=INFO,
+            width=15
+        )
+        self.download_button.pack(side=RIGHT, padx=(0, 10))
+
         # Set current model if it exists
         current_model = self.config.get_setting('model', 'base')
         if current_model in available_models:
@@ -278,18 +292,103 @@ class SettingsDialog:
         elif available_models and available_models[0] != "No models found":
             self.model_var.set(available_models[0])
 
-        # Download Models button
-        download_frame = ttk.Frame(model_frame)
-        download_frame.pack(fill=X, pady=(10, 0))
+        # Whisper Language selection
+        self.language_frame = ttk.Frame(transcription_frame)
+        self.language_frame.pack(fill=X, pady=(10, 5))
 
-        download_button = ttk.Button(
-            download_frame,
-            text="Download Models",
-            command=self._show_model_download_from_settings,
-            bootstyle=INFO,
-            width=15
+        ttk.Label(self.language_frame, text="Whisper Language:").pack(side=LEFT)
+
+        self.language_var = tk.StringVar(value=self.config.get_setting('whisper_language', 'auto'))
+        self.language_entry = ttk.Entry(
+            self.language_frame,
+            textvariable=self.language_var,
+            width=10
         )
-        download_button.pack(side=RIGHT)
+        self.language_entry.pack(side=RIGHT)
+        
+        ttk.Label(self.language_frame, text="(e.g., 'auto', 'en', 'de', 'fr', ...)", font=("Arial", 8)).pack(side=RIGHT, padx=(0, 5))
+
+        # Whisper Threads selection
+        self.threads_frame = ttk.Frame(transcription_frame)
+        self.threads_frame.pack(fill=X, pady=(5, 5))
+
+        ttk.Label(self.threads_frame, text="Whisper Threads:").pack(side=LEFT)
+
+        self.threads_var = tk.StringVar(value=str(self.config.get_setting('whisper_threads', 4)))
+        self.threads_entry = ttk.Entry(
+            self.threads_frame,
+            textvariable=self.threads_var,
+            width=10
+        )
+        self.threads_entry.pack(side=RIGHT)
+        
+        ttk.Label(self.threads_frame, text="(Number of CPU cores to use)", font=("Arial", 8)).pack(side=RIGHT, padx=(0, 5))
+
+        # Divider between Local and Remote
+        ttk.Separator(transcription_frame, orient=HORIZONTAL).pack(fill=X, pady=15)
+
+        # Remote Whisper Server Section
+        ttk.Label(transcription_frame, text="Remote Whisper Server Settings", font=("Arial", 10, "bold")).pack(anchor=W, pady=(0, 10))
+
+        info_label = ttk.Label(
+                   transcription_frame,
+                   text="Use a remote Whisper server for transcription (e.g., the Docker image\nlscr.io/linuxserver/faster-whisper or a custom server instance).",
+                   font=("Arial", 10),
+                   bootstyle=INFO
+        )
+        info_label.pack(anchor=W, pady=(0, 10))
+
+        # Use remote server toggle
+        self.use_remote_server_var = tk.BooleanVar(value=self.config.get_setting('use_remote_server', False))
+        use_remote_server_check = ttk.Checkbutton(
+            transcription_frame,
+            text="Use remote Whisper server (via network)",
+            variable=self.use_remote_server_var,
+            bootstyle="round-toggle",
+            command=self._on_remote_server_toggle
+        )
+        use_remote_server_check.pack(anchor=W, pady=(0, 10))
+
+        # Server Host and Port
+        server_config_frame = ttk.Frame(transcription_frame)
+        server_config_frame.pack(fill=X)
+
+        self.server_host_frame = ttk.Frame(server_config_frame)
+        self.server_host_frame.pack(side=LEFT)
+        ttk.Label(self.server_host_frame, text="Host:").pack(side=LEFT)
+        self.server_host_var = tk.StringVar(value=self.config.get_setting('whisper_server_host', 'localhost'))
+        self.server_host_entry = ttk.Entry(self.server_host_frame, textvariable=self.server_host_var, width=15)
+        self.server_host_entry.pack(side=LEFT, padx=(5, 15))
+
+        self.server_port_frame = ttk.Frame(server_config_frame)
+        self.server_port_frame.pack(side=LEFT)
+        ttk.Label(self.server_port_frame, text="Port:").pack(side=LEFT)
+        self.server_port_var = tk.StringVar(value=str(self.config.get_setting('whisper_server_port', 10300)))
+        self.server_port_entry = ttk.Entry(self.server_port_frame, textvariable=self.server_port_var, width=7)
+        self.server_port_entry.pack(side=LEFT, padx=(5, 0))
+
+        # Initial state update
+        self._on_remote_server_toggle()
+
+    def _on_remote_server_toggle(self):
+        """Update UI state when remote server toggle changes"""
+        is_remote = self.use_remote_server_var.get()
+        state = NORMAL if is_remote else DISABLED
+        self.server_host_entry.config(state=state)
+        self.server_port_entry.config(state=state)
+        
+        # Also disable local model selection if using remote server
+        model_state = DISABLED if is_remote else "readonly"
+        self.model_combo_dialog.config(state=model_state)
+        
+        # Disable download button if using remote server
+        download_state = DISABLED if is_remote else NORMAL
+        self.download_button.config(state=download_state)
+
+        # Disable language and threads if using remote server
+        local_state = DISABLED if is_remote else NORMAL
+        self.language_entry.config(state=local_state)
+        self.threads_entry.config(state=local_state)
 
     def _create_general_section(self, parent):
         """Create the general settings section"""
@@ -335,38 +434,6 @@ class SettingsDialog:
             width=10
         )
         key_delay_entry.pack(side=RIGHT)
-
-        # Whisper Language selection
-        language_frame = ttk.Frame(general_frame)
-        language_frame.pack(fill=X, pady=(5, 5))
-
-        ttk.Label(language_frame, text="Whisper Language:").pack(side=LEFT)
-
-        self.language_var = tk.StringVar(value=self.config.get_setting('whisper_language', 'auto'))
-        language_entry = ttk.Entry(
-            language_frame,
-            textvariable=self.language_var,
-            width=10
-        )
-        language_entry.pack(side=RIGHT)
-        
-        ttk.Label(language_frame, text="(e.g., 'auto', 'en', 'de', 'fr', ...)", font=("Arial", 8)).pack(side=RIGHT, padx=(0, 5))
-
-        # Whisper Threads selection
-        threads_frame = ttk.Frame(general_frame)
-        threads_frame.pack(fill=X, pady=(5, 5))
-
-        ttk.Label(threads_frame, text="Whisper Threads:").pack(side=LEFT)
-
-        self.threads_var = tk.StringVar(value=str(self.config.get_setting('whisper_threads', 4)))
-        threads_entry = ttk.Entry(
-            threads_frame,
-            textvariable=self.threads_var,
-            width=10
-        )
-        threads_entry.pack(side=RIGHT)
-        
-        ttk.Label(threads_frame, text="(Number of CPU cores to use)", font=("Arial", 8)).pack(side=RIGHT, padx=(0, 5))
 
         # Keyboard device selection
         keyboard_frame = ttk.Frame(general_frame)
@@ -453,7 +520,7 @@ class SettingsDialog:
         add_frame.pack(fill=X, pady=(10, 10))
 
         # Entry fields for new override
-        ttk.Label(add_frame, text="Add Override:", font=("Arial", 9, "bold")).pack(anchor=W)
+        ttk.Label(add_frame, text="Add Replacement:", font=("Arial", 9, "bold")).pack(anchor=W)
 
         input_frame = ttk.Frame(add_frame)
         input_frame.pack(fill=X, pady=(5, 0))
@@ -468,7 +535,7 @@ class SettingsDialog:
         self.replacement_entry = ttk.Entry(input_frame, width=15)
         self.replacement_entry.pack(side=LEFT, padx=(5, 10))
 
-        # Buttons for managing overrides
+        # Buttons for managing replacements
         buttons_frame = ttk.Frame(overrides_frame)
         buttons_frame.pack(fill=X, pady=(10, 0))
 
@@ -710,6 +777,14 @@ class SettingsDialog:
             self.config.set_setting('keyboard_device', selected_keyboard_path)
             self.config.set_setting('whisper_language', self.language_var.get().strip() or 'auto')
 
+            # Update Whisper server settings
+            self.config.set_setting('use_remote_server', self.use_remote_server_var.get())
+            self.config.set_setting('whisper_server_host', self.server_host_var.get().strip() or 'localhost')
+            try:
+                self.config.set_setting('whisper_server_port', int(self.server_port_var.get().strip()))
+            except ValueError:
+                self.config.set_setting('whisper_server_port', 10300)
+
             # Validate and update whisper threads setting
             threads_str = self.threads_var.get().strip()
             try:
@@ -737,6 +812,14 @@ class SettingsDialog:
             if not self.config.save_config():
                 messagebox.showerror("Error", "Failed to save settings to file!")
                 return
+
+            # Re-initialize whisper manager to pick up potential server changes
+            if hasattr(self.parent, 'whisper_manager'):
+                print("Re-initializing WhisperManager...")
+                self.parent.whisper_manager.initialize()
+            elif hasattr(self.app_instance, 'whisper_manager'):
+                print("Re-initializing WhisperManager from app_instance...")
+                self.app_instance.whisper_manager.initialize()
 
             # Update parent window's always on top setting
             self.parent.attributes('-topmost', self.always_on_top_var.get())
@@ -911,7 +994,7 @@ class WhisperTuxApp:
         audio_device_id = self.config.get_setting('audio_device', None)
         self.audio_capture = AudioCapture(device_id=audio_device_id)
 
-        self.whisper_manager = WhisperManager()
+        self.whisper_manager = WhisperManager(self.config)
         self.text_injector = TextInjector(self.config)
         self.global_shortcuts = None
 
@@ -1103,7 +1186,7 @@ class WhisperTuxApp:
         ttk.Label(model_info_frame, text="Model:", font=("Arial", 9)).pack(side=LEFT)
         self.model_display_label = ttk.Label(
             model_info_frame,
-            text=self.config.get_setting('model', 'base'),
+            text="Remote" if self.config.get_setting('use_remote_server', False) else self.config.get_setting('model', 'base'),
             font=("Arial", 9, "bold"),
             bootstyle=INFO
         )
@@ -1481,7 +1564,10 @@ class WhisperTuxApp:
 
         # Update model display
         if self.model_display_label:
-            current_model = self.config.get_setting('model', 'base')
+            if self.config.get_setting('use_remote_server', False):
+                current_model = "Remote"
+            else:
+                current_model = self.config.get_setting('model', 'base')
             self.model_display_label.config(text=current_model)
             print(f"Updated model display to: {current_model}")
 

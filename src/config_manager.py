@@ -25,6 +25,9 @@ class ConfigManager:
             'always_on_top': True,
             'theme': 'darkly',
             'audio_device': None,  # None means use system default
+            'use_remote_server': False,
+            'whisper_server_host': 'localhost',
+            'whisper_server_port': 10300,
             'word_overrides': {}  # Dictionary of word replacements: {"original": "replacement"}
         }
         
