@@ -1,5 +1,6 @@
 venv
 .venv
 whisper.cpp
+ydotoold.service
 __pycache__
 **/src/__pycache__
