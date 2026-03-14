@@ -252,10 +252,10 @@ class SettingsDialog:
 
         # Get available models from whisper manager
         try:
-            # Access the parent's whisper manager through the parent window
+            # Access the app instance's whisper manager
             available_models = []
-            if hasattr(self.parent, 'whisper_manager'):
-                available_models = self.parent.whisper_manager.get_available_models()
+            if self.app_instance and hasattr(self.app_instance, 'whisper_manager'):
+                available_models = self.app_instance.whisper_manager.get_available_models()
             if not available_models:
                 available_models = ["No models found"]
         except:
@@ -1458,8 +1458,10 @@ class WhisperTuxApp:
 
         # List of available models to download
         available_models = [
-            "base.en", "small.en", "medium.en", "large-v3",
-            "base", "small", "medium", "large"
+            "tiny", "tiny.en", "base", "base.en", "small", "small.en",
+            "small.en-tdrz", "medium", "medium.en", "large-v1", "large-v2",
+            "large-v2-q5_0", "large-v3", "large-v3-q5_0", "large-v3-turbo",
+            "large-v3-turbo-q5_0"
         ]
 
         # Create a custom dialog for model selection
