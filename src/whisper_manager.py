@@ -27,6 +27,7 @@ class WhisperManager:
             
         # Whisper configuration
         self.current_model = self.config.get_setting('model', 'base')
+        self.language = self.config.get_setting('whisper_language', 'auto')
         self.whisper_binary = None
         self.model_path = None
         self.temp_dir = None
@@ -144,7 +145,7 @@ class WhisperManager:
                 '-m', str(self.model_path),
                 '-f', audio_file_path,
                 '--output-txt',
-                '--language', 'en',
+                '--language', self.config.get_setting('whisper_language', 'auto'),
                 '--threads', '4'
             ]
             
@@ -223,9 +224,9 @@ class WhisperManager:
         
         # Look for the supported model files
         supported_models = [
-            'tiny', 'tiny.en', 'base', 'base.en', 'small', 'small.en', 
-            'small.en-tdrz', 'medium', 'medium.en', 'large-v1', 'large-v2', 
-            'large-v2-q5_0', 'large-v3', 'large-v3-q5_0', 'large-v3-turbo', 
+            'tiny', 'tiny.en', 'base', 'base.en', 'small', 'small.en',
+            'small.en-tdrz', 'medium', 'medium.en', 'large-v1', 'large-v2',
+            'large-v2-q5_0', 'large-v3', 'large-v3-q5_0', 'large-v3-turbo',
             'large-v3-turbo-q5_0'
         ]
         

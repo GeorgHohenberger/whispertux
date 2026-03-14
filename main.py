@@ -336,6 +336,22 @@ class SettingsDialog:
         )
         key_delay_entry.pack(side=RIGHT)
 
+        # Whisper Language selection
+        language_frame = ttk.Frame(general_frame)
+        language_frame.pack(fill=X, pady=(5, 5))
+
+        ttk.Label(language_frame, text="Whisper Language:").pack(side=LEFT)
+
+        self.language_var = tk.StringVar(value=self.config.get_setting('whisper_language', 'auto'))
+        language_entry = ttk.Entry(
+            language_frame,
+            textvariable=self.language_var,
+            width=10
+        )
+        language_entry.pack(side=RIGHT)
+        
+        ttk.Label(language_frame, text="(e.g., 'auto', 'en', 'de', 'fr', ...)", font=("Arial", 8)).pack(side=RIGHT, padx=(0, 5))
+
         # Keyboard device selection
         keyboard_frame = ttk.Frame(general_frame)
         keyboard_frame.pack(fill=X, pady=(5, 0))
@@ -676,6 +692,7 @@ class SettingsDialog:
             self.config.set_setting('always_on_top', self.always_on_top_var.get())
             self.config.set_setting('use_clipboard', self.use_clipboard_var.get())
             self.config.set_setting('keyboard_device', selected_keyboard_path)
+            self.config.set_setting('whisper_language', self.language_var.get().strip() or 'auto')
 
             # Update model setting if changed
             new_model = self.model_var.get()
@@ -792,6 +809,7 @@ class SettingsDialog:
                 self.always_on_top_var.set(self.config.get_setting('always_on_top'))
                 self.key_delay_var.set(str(self.config.get_setting('key_delay')))
                 self.use_clipboard_var.set(self.config.get_setting('use_clipboard'))
+                self.language_var.set(self.config.get_setting('whisper_language', 'auto'))
 
                 # Update the current shortcut display in the dialog
                 if self.current_shortcut_label:
