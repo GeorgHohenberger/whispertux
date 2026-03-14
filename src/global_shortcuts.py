@@ -20,6 +20,14 @@ class GlobalShortcuts:
         self.callback = callback
         self.selected_device_path = device_path
         
+        # Modifier groups to handle both Left and Right versions
+        self.modifier_groups = {
+            'ctrl': {ecodes.KEY_LEFTCTRL, ecodes.KEY_RIGHTCTRL},
+            'alt': {ecodes.KEY_LEFTALT, ecodes.KEY_RIGHTALT},
+            'shift': {ecodes.KEY_LEFTSHIFT, ecodes.KEY_RIGHTSHIFT},
+            'super': {ecodes.KEY_LEFTMETA, ecodes.KEY_RIGHTMETA, ecodes.KEY_LEFTMETA, ecodes.KEY_RIGHTMETA} # META is often SUPER
+        }
+        
         # Device and event handling
         self.devices = []
         self.device_fds = {}
@@ -39,7 +47,11 @@ class GlobalShortcuts:
         self._discover_keyboards()
         
         print(f"Global shortcuts initialized with key: {primary_key}")
-        print(f"Parsed keys: {[self._keycode_to_name(k) for k in self.target_keys]}")
+        # Use target_keys since it's now a list of sets
+        parsed_names = []
+        for group in self.target_keys:
+            parsed_names.append("/".join([self._keycode_to_name(k) for k in group]))
+        print(f"Parsed keys groups: {parsed_names}")
         print(f"Found {len(self.devices)} keyboard device(s)")
         
     def _discover_keyboards(self):
@@ -102,9 +114,9 @@ class GlobalShortcuts:
         
         return any(key in keys for key in keyboard_keys)
     
-    def _parse_key_combination(self, key_string: str) -> Set[int]:
-        """Parse a key combination string into a set of evdev key codes"""
-        keys = set()
+    def _parse_key_combination(self, key_string: str) -> List[Set[int]]:
+        """Parse a key combination string into a list of sets of evdev key codes (each set is a modifier group or single key)"""
+        target_keys_groups = []
         key_lower = key_string.lower().strip()
         
         # Remove angle brackets if present
@@ -115,18 +127,25 @@ class GlobalShortcuts:
         
         for part in parts:
             part = part.strip()
+            
+            # Check if it's a modifier group
+            if part in self.modifier_groups:
+                target_keys_groups.append(self.modifier_groups[part])
+                continue
+                
+            # Otherwise, get a single keycode
             keycode = self._string_to_keycode(part)
             if keycode is not None:
-                keys.add(keycode)
+                target_keys_groups.append({keycode})
             else:
                 print(f"Warning: Could not parse key '{part}' in '{key_string}'")
                 
         # Default to F12 if no keys parsed
-        if not keys:
+        if not target_keys_groups:
             print(f"Warning: Could not parse key combination '{key_string}', defaulting to F12")
-            keys.add(ecodes.KEY_F12)
+            target_keys_groups.append({ecodes.KEY_F12})
             
-        return keys
+        return target_keys_groups
     
     def _string_to_keycode(self, key_string: str) -> Optional[int]:
         """Convert a key string to evdev keycode"""
@@ -238,7 +257,38 @@ class GlobalShortcuts:
     
     def _check_shortcut_combination(self):
         """Check if current pressed keys match target combination"""
-        if self.target_keys.issubset(self.pressed_keys):
+        # Ensure all required groups have at least one key pressed
+        all_groups_pressed = True
+        all_target_keys = set()
+        for group in self.target_keys:
+            all_target_keys.update(group)
+            if not (group & self.pressed_keys):
+                all_groups_pressed = False
+                break
+        
+        if all_groups_pressed:
+            # For modifier-only shortcuts, we want to be stricter
+            # Check if any non-target keys are pressed
+            # A key is a target key if it belongs to one of the target groups
+            # However, if we only have modifiers, we don't want other keys to be pressed
+            
+            is_modifier_only = True
+            for target_group in self.target_keys:
+                is_this_group_modifier = False
+                for mod_group in self.modifier_groups.values():
+                    if target_group.issubset(mod_group):
+                        is_this_group_modifier = True
+                        break
+                if not is_this_group_modifier:
+                    is_modifier_only = False
+                    break
+            
+            if is_modifier_only:
+                # If only modifiers are required, NO other keys should be pressed
+                non_target_pressed = self.pressed_keys - all_target_keys
+                if non_target_pressed:
+                    return
+            
             current_time = time.time()
             
             # Implement debouncing
@@ -358,11 +408,15 @@ class GlobalShortcuts:
     
     def get_status(self) -> dict:
         """Get the current status of global shortcuts"""
+        target_keys_names = []
+        for group in self.target_keys:
+            target_keys_names.append("/".join([self._keycode_to_name(k) for k in group]))
+            
         return {
             'is_running': self.is_running,
             'is_active': self.is_active(),
             'primary_key': self.primary_key,
-            'target_keys': [self._keycode_to_name(k) for k in self.target_keys],
+            'target_keys': target_keys_names,
             'pressed_keys': [self._keycode_to_name(k) for k in self.pressed_keys],
             'device_count': len(self.devices)
         }
