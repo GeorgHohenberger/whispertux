@@ -146,7 +146,7 @@ class WhisperManager:
                 '-f', audio_file_path,
                 '--output-txt',
                 '--language', self.config.get_setting('whisper_language', 'auto'),
-                '--threads', '4'
+                '--threads', str(self.config.get_setting('whisper_threads', 4))
             ]
             
             # Run the command
@@ -223,16 +223,25 @@ class WhisperManager:
         available_models = []
         
         # Look for the supported model files
-        supported_models = [
-            'tiny', 'tiny.en', 'base', 'base.en', 'small', 'small.en',
-            'small.en-tdrz', 'medium', 'medium.en', 'large-v1', 'large-v2',
-            'large-v2-q5_0', 'large-v3', 'large-v3-q5_0', 'large-v3-turbo',
-            'large-v3-turbo-q5_0'
-        ]
+        supported_models = ['tiny', 'base', 'small', 'medium', 'large', 'large-v3-turbo']
         
         for model in supported_models:
-            model_file = models_dir / f"ggml-{model}.bin"
-            if model_file.exists():
-                available_models.append(model)
+            # Check for both English-only and multilingual versions
+            model_files = [
+                models_dir / f"ggml-{model}.en.bin",  # English-only
+                models_dir / f"ggml-{model}.bin"      # Multilingual
+            ]
+            
+            for model_file in model_files:
+                if model_file.exists():
+                    # Add model name with suffix if it's English-only
+                    if model_file.name.endswith('.en.bin'):
+                        model_name = f"{model}.en"
+                    else:
+                        model_name = model
+                    
+                    if model_name not in available_models:
+                        available_models.append(model_name)
+                    break  # Don't add both versions of same model
         
         return sorted(available_models)

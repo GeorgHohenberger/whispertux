@@ -352,6 +352,22 @@ class SettingsDialog:
         
         ttk.Label(language_frame, text="(e.g., 'auto', 'en', 'de', 'fr', ...)", font=("Arial", 8)).pack(side=RIGHT, padx=(0, 5))
 
+        # Whisper Threads selection
+        threads_frame = ttk.Frame(general_frame)
+        threads_frame.pack(fill=X, pady=(5, 5))
+
+        ttk.Label(threads_frame, text="Whisper Threads:").pack(side=LEFT)
+
+        self.threads_var = tk.StringVar(value=str(self.config.get_setting('whisper_threads', 4)))
+        threads_entry = ttk.Entry(
+            threads_frame,
+            textvariable=self.threads_var,
+            width=10
+        )
+        threads_entry.pack(side=RIGHT)
+        
+        ttk.Label(threads_frame, text="(Number of CPU cores to use)", font=("Arial", 8)).pack(side=RIGHT, padx=(0, 5))
+
         # Keyboard device selection
         keyboard_frame = ttk.Frame(general_frame)
         keyboard_frame.pack(fill=X, pady=(5, 0))
@@ -694,6 +710,18 @@ class SettingsDialog:
             self.config.set_setting('keyboard_device', selected_keyboard_path)
             self.config.set_setting('whisper_language', self.language_var.get().strip() or 'auto')
 
+            # Validate and update whisper threads setting
+            threads_str = self.threads_var.get().strip()
+            try:
+                threads_value = int(threads_str)
+                if threads_value < 1:
+                    messagebox.showwarning("Invalid Input", "Whisper threads must be a positive integer (minimum 1).")
+                    return
+                self.config.set_setting('whisper_threads', threads_value)
+            except ValueError:
+                messagebox.showwarning("Invalid Input", "Whisper threads must be a valid number.")
+                return
+
             # Update model setting if changed
             new_model = self.model_var.get()
             if new_model != "No models found":
@@ -810,6 +838,7 @@ class SettingsDialog:
                 self.key_delay_var.set(str(self.config.get_setting('key_delay')))
                 self.use_clipboard_var.set(self.config.get_setting('use_clipboard'))
                 self.language_var.set(self.config.get_setting('whisper_language', 'auto'))
+                self.threads_var.set(str(self.config.get_setting('whisper_threads', 4)))
 
                 # Update the current shortcut display in the dialog
                 if self.current_shortcut_label:

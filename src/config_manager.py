@@ -18,6 +18,7 @@ class ConfigManager:
             'primary_shortcut': 'F12',
             'model': 'base',
             'whisper_language': 'auto',
+            'whisper_threads': 4,
             'key_delay': 15,  # Delay between keystrokes in milliseconds for ydotool
             'use_clipboard': False,
             'window_position': None,
